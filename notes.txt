@@ -1,0 +1,226 @@
+CompBio Summer Research
+
+
+6/13/16
+    PhyloWGS (updated phylosub)
+        needs: Python 2 version of ETE2, GNU Scientific Library (GSL)
+    Pyclone
+    CTPSingle
+    TrAp
+    AncesTree
+    Newick Format (for writing phylogenetic trees)
+        https://en.wikipedia.org/wiki/Newick_format
+        
+    LICHeE
+        run from release: ./lichee -build -i ../data/ccRCC/test3.txt -maxVAFAbsent 0.005 -minVAFPresent 0.005 -n 0 -showTree 1 -color -dot
+        run from data/ccRCC: dot -Tpng tree.dot -o tree.png
+        modify data files in ccRCC to create different data/trees
+            good for making simulated data
+            can parse dot files or modify LICHeE code to make a txt file or something/decide how to represent tree data- dot files contains each sub-pop and info about the mutations in the final clusters, and the percentage of those clusters
+        problem: LICHeE trees are made from multiple samples so VAF doesn't represent the VAF for the entire tumor, just that sample. Meaning VAF will be less helpful for creating consensus and it will be hard to predict VAF in actual tumor.
+
+6/15/16
+	Using PhyloWGS trees as sample data to create consensus tree
+		3 methods to group mutations:
+			most common node
+			most common pairings with other mutations
+			most common parents (gets groupings and structure of tree) 
+				problem is that there can still be conflicts (don’t know which group to put it in- maybe use clonal frequency?)- match by parents or children?
+				or maybe still print out multiple trees?
+	running dot files: dot -Tpng tree.dot -o tree.png
+
+6/16/16
+papers to look at: http://www.hindawi.com/journals/bmri/2012/797812/
+http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3822366/
+http://bioinformatics.oxfordjournals.org/content/suppl/2015/06/12/btv261.DC1/El-Kebir_223_sup_1.pdf
+https://www.intogen.org/search
+
+mutations are from: http://www.cbioportal.org/index.do?cancer_study_list=&cancer_study_id=all&data_priority=0&case_ids=&patient_case_select=sample&gene_set_choice=user-defined-list&gene_list=&clinical_param_selection=null&tab_index=tab_download&Action=
+
+6/20/16
+Inducing error:
+	switch parent and child
+	make child the parent of its parent
+	move a mutation to a different cluster
+	move a mutation to a brand new cluster
+	combine a parent and child cluster
+Add frequencies:
+	currently frequencies start at 90, and each child has a frequency that is half that of its parent
+	i’m not sure how I should assign frequencies- each cluster should have its own frequency
+Using frequencies to determine type of error:
+	change the frequencies from the original tree, then:
+		if a frequency for one cluster is very close to that of another cluster, combine them, or maybe move one mutation from that cluster to the other cluster
+	or maybe use individual frequencies for each mutation and induce error into those:
+		then if a mutation has a frequency unlike any other create a new cluster for it
+	if the frequency of the child is greater than that of the parent then either switch them or make the child the parent (depending on the frequencies of the other clusters)
+
+6/21/16
+Problems from week 1 that have been fixed:
+	combines mutations that have the same parent- means that separate clusters with the same parent and no children will be combined
+        when building true tree it is possible to create a cluster with no mutations
+
+Problems that may still exist (although i haven’t seen them recently…):        
+	It is possible that a mutation will not be included in the tree (if doesn't reach threshold)
+            The tree should have exactly c-1 edges, but this isn't always true
+            Maybe go back and add in mutations that don't reach the threshold
+                pair them with the mutation that they are most similar to (?)
+                but what if the mutation shouldn't be paired with any other nodes (should be in cluster on its own)?
+        Can output forest instead of tree
+        Clusters can point at each other
+
+Completed Goals from week 1:
+    improved method of creating test trees
+    incorporate clonal frequencies to make test trees
+    found way to compare the consensus tree to the original tree (still need to code it)
+
+Goals to work on:    
+    create better way of resolving conflicts in the tree
+    incorporate clonal frequencies to evaluate trees or weight items from test trees
+    creating original trees - how to set frequencies?
+
+Questions:
+MAYBE…should have clonal frequencies for each mutation
+is there enough error/are the errors I created logical?
+what are good frequencies to test?
+
+6/22/16
+When the ratio between a parent and child is closer than the structural relationship is less reliable (dont think that is necessarily true)
+use a distance matrix to create consensus tree-
+    make distance matrix for each test tree
+    average (and round) the number in each cell to create the consensus tree
+        can get rid of adjacency matrix all together
+        the child will have distances to its ancestors that are its parents distance+1
+        the child will be the distance to its ancestors as its parents distance+1
+        create a normal cell that is always the root
+        then begin by creating clusters (anything that has a distance <.5 to each other)
+        just add initial edges first (distances of 1)
+            start at root and then go out from there to get the direction for each edge
+        then use the other distances to evaluate/resolve conflicts
+        try to maximize similarity to that matrix when resolving conflicts
+        cost of combining cells vs removing an edge
+        which group of mutations is closer to the other cluster (has a lower total value)
+        or could sum up the difference for all the mutations of having a cluster is one location or another
+            what is the distance in the average matrix vs each of these options 
+        if both clusters have a low value and a fairly low value to each other than combine them
+6/23/16
+Using mutational frequencies:
+    make the consensus tree then use them to evaluate it
+    a set of mutational frequencies can map (accurately fit) to multiple permutations of a tree
+    therefore look at substructures in the consensus tree (such as parent/children) and see if they are possible given the mutational frequencies from the test data.
+
+6/27/16
+To Do:
+-statement of problem
+-graph relationship between frequency info and performance of method, then incorporate frequency information into creating trees
+-graph performance of method
+-try another method
+—-MCMC
+——set constant transition probability or set transition probability as % of test trees in which this relationship exists/is possible given the frequencies
+——probability of a tree is proportional to the product of probabilities of mutations from the root to all its descendants (need to figure out how to calculate this)
+—-could also create score for each tree -> try to maximize possible frequencies score, parent/child relationship score and clustering score —> should I just move to higher score, or should I move towards lower score with some probability (prevent getting stuck at local max)
+—-make incremental changes a tree -> alternate between changing locations of clustering and mutations within the clusters, or start at a fairly likely tree, make making changes easier
+
+6/28/16
+Goal: create a MCMCMC (Metropolis Coupling Monte Carlo Markov Chain) that takes into account possible tree structures as well as mutational frequencies to create a probable tree
+Questions: what is the prior/what should the distribution? How should mutational frequencies, structure of the tree and clusterings weigh into how probable a tree, given the data? How many iterations should I run?
+
+6/29/20
+MCMCMCM
+parameters: topological changes, clustering changes, frequencies
+possible ways to move to a neighboring tree:
+(not sure how often each of these should occur- what changes need to happen more frequently to get to a better tree?)
+-switch a parent and child cluster = error 1
+-move a child cluster to be the parent of its parent = error 2
+-move a cluster to be siblings with its parent = need new method
+-combine a parent and child cluster = error 5
+-move a mutation: to a parent/child = error 3
+		  to a new cluster that is its parent, = modified error 4
+                  to a new cluster that is its child, = modified error 4
+These changes ensure that the no distance between two mutations changes by more than one, so that the trees are neighbors
+Incorporating frequencies:
+-could give each cluster a frequency (randomly at first), but the problem is that frequencies can’t change independently- they are related to the topology and number of clusters
+-hard to adjust them, and create neighboring frequencies
+-could try to give the tree frequencies after the topology is created- this means that frequencies wouldn’t be incorporated into creating the tree, but could give a secondary assessment of how good the tree is
+Likelihood:
+-create distance matrix for the new tree and create a distribution of possible distances based on the data (unsure of what this should look like)
+-product of the likelihoods of each cell in the distance matrix is the probability of that tree
+Other possibilities/problems/comments:
+-if I do incorporate frequencies, what should be the likelihood of each frequency?
+-how many clusters should the first created tree have? I don’t want to assume a certain number of clusters
+-or should there be a prior over number of clusters - should some number of cluster be more likely than others?
+-Dirichlet Distribution 
+-frequencies would need to be restricted so that the frequency of a parent is >= the sum of the frequencies of its children 
+-initial proposed tree should probably be randomly created so I don’t assume anything
+-how many iterations should I run? what is a good threshold (for probability?) to stop at, or should I just do X number of iterations
+-this is different from standard MCMCMC with phylogenetic trees as I am assuming that I know the values of the internal nodes
+-could also try another MCMCMC where I don’t use distances and I just use mutational frequencies - give mutational frequencies to each mutation and give higher likelihood to mutations that have similar frequencies and use frequencies to decide which clusters could  be parents/children of each other
+-or I could just incorporate frequencies into my initial assessment of likelihood- don’t give the proposed tree frequencies, but evaluate it given whether the test data mutational frequencies find it possible
+	only problem about this is it feels like it is redundant information - mutations that aren’t parents/children will be docked twice for it … maybe not true if I use distances instead of probability of parent/children (like it current method) because distances don’t tell direction
+To Do:
+-fix/finish current method (use frequencies, maybe still improve how I am creating the test trees, because they can have impossible frequencies)
+-begin creating the MCMCMC - maybe just start with the frequencies and distances as given probabilities rather than a distribution (maybe give some small value to distances/frequencies that never appear in the data, so that they are still unlikely but not impossible)
+	-probability of a tree is equal to the product of the likeligood that each mutation is that distance away from any other mutation times the probability that each parent/child relationship is possible
+	-that is a lot of calculation/info to store…
+-try without prior on number of clusters, then try with
+-create initial tree with a random number of clusters (maybe between 2 and 10 (?))- still some assumption but…
+7/1/16
+MCMC not working
+ideas: try to get one parameter correct before the other -> maybe calculate the probability of different clusterings to find an optimal clustering and then try to find the optimal topology of the tree. Or at least try with just clustering first to see how the MCMC works…
+Something wrong with my original method - it doesn’t seem to be inducing enough error, the frequencies are always supported … not exactly sure of the problem -> compare to previous code on bitbucket
+7/5/16
+Fixed some problems
+uncomment the move nodes for moving siblings for the MCMCMC
+continue tweaking (and reading about) MCMCMC
+integrate distributions…
+write up formal descriptions
+7/6/16
+Coupling- once the two chains reach the same state they are ‘coupled’ and you don’t need to continue with the other chain…
+7/7/16
+Using new method to create test trees- need to work out the bugs (mostly problems with error 4)
+7/11/16
+MCMC working okay - able to closely approximate true tree/consensus tree at least for trees with 14>=mutations
+need to get distanceSum to work correctly- just stops running/stalls/doesn’t halt and I don’t know why
+7/13/16
+Apache Commons Math3 package (for log beta calculation):
+export CLASSPATH=.:/Accounts/warrena/Downloads/commons-math3-3.6.1/commons-math3-3.6.1.jar
+
+To Do:
+Figure out how to better use the beta distribution comparison probability calculation - talk about with Layla
+Formalize the problem!
+Test the different methods for smaller dataset - see how well it can create a tree with fewer samples
+maybe write program to run it and write all the comparison data i want so I can just let it run many times to do more tests on it
+7/14/16
+Reevaluate probability calculation for Probabilistic MCMC - does it make sense, should I use a distribution rather than just frequency of event (couldn’t find a distribution that seemed to model the data). 
+Finish write up/formalizing the problem
+run more tests -> chart the data, also looking at how the variations in the test data affect things, what scenarios does one method work better than another (# of clusters, types of error, size of dataset, number of mutations, etc)?
+How are the different methods biased (tend toward flat trees, tend toward chains, tend toward small clusters, big clusters, etc.)
+Brainstorm more ways to calculate the probability of a tree -> read more…
+If I don’t use a joint probability, what should I use… 
+
+7/15/16
+Idea for probability of a tree -> given two frequencies what is the likelihood that those two mutation should be in the same cluster, and given a parent and child mutation and their frequencies what is the likelihood that the parent frequency is larger than the child frequency
+	how do I calculate the probability that two frequencies are the same?
+	only thing is if I am just using frequency information than i’m not taking any of the information from the given trees…
+
+7/18/16
+Estimating the mixing percentages (the percent of each subpopulation in the actual tumor)
+	if the sample is x% of the whole tumor, then what is the likelihood of the given population percentages
+	for example if we sample 1% of the tumor, what is the likelihood that cluster 1 is .97 of the sample having seen that value…having seen the values .99, .97, .91, .66 and 1… —> use repeated sampling test…
+7/19/16
+Probability MCMC functioning oddly on real data -> getting stuck at VERY low probability, not sure why
+read/look for method for calculating the % of cancerous cells in the tumor - maybe also try working with R, look at AncesTree
+Keep clarifying problem, adding to that document
+7/22/16
+modify methods to work with missing mutations in some trees
+do tests on simulated data
+work more on using real data -> esp from different papers
+cancerous cell proportion problem:
+	beginning with normal distribution with parameters of mean proportion and standard deviation -> range of values with 90% probability, or 70% probability etc. 
+	trying to calculate if the cancerous cells aren’t evenly distributed
+8/12/16
+Last Day
+Code cleaned up- removed code not being used and files in repo that aren’t relevant any more
+creating output file for simulated data- nothing for real data yet
+user should be able to input:
+	for simulated Data- simulated, # of samples, mutation file, # of clusters, # of trials
+	for real Data- real, # of samples, input file
